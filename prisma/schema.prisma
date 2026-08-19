@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String            @id @default(uuid())
+  name             String
+  email            String            @unique
+  password         String
+  role             String            @default("VENDEDOR") // VENDEDOR, ADMINISTRADOR, GERENTE, ROOT
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  productionOrders ProductionOrder[]
+  sales            Sale[]
+}
+
+model Supply {
+  id             String       @id @default(uuid())
+  name           String
+  unit           String       // ex: L, Kg, Unid, Galão 20L
+  stockQuantity  Float        @default(0)
+  minStock       Float        @default(0)
+  costPerUnit    Float        @default(0)
+  batchNumber    String?      // Número de Lote (ex: LT-2026-089A)
+  supplier       String?      // Nome do Fornecedor / Fabricante
+  purchaseDate   DateTime?    // Data de Compra / Entrada
+  expirationDate DateTime?    // Data de Validade da Matéria-Prima
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  recipeItems    RecipeItem[]
+}
+
+model Product {
+  id               String            @id @default(uuid())
+  name             String
+  category         String            // ex: Limpeza Pesada, Desinfetante, Detergente
+  unit             String            // ex: 500ml, 1L, 5L, 20L
+  stockQuantity    Float             @default(0)
+  minStock         Float             @default(0)
+  price            Float             @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  recipe           Recipe?
+  productionOrders ProductionOrder[]
+  saleItems        SaleItem[]
+}
+
+model Recipe {
+  id          String       @id @default(uuid())
+  productId   String       @unique
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  items       RecipeItem[]
+}
+
+model RecipeItem {
+  id               String @id @default(uuid())
+  recipeId         String
+  recipe           Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  supplyId         String
+  supply           Supply @relation(fields: [supplyId], references: [id], onDelete: Cascade)
+  quantityRequired Float  // Quantidade necessária para produzir 1 UNIDADE do produto final
+}
+
+model ProductionOrder {
+  id                String    @id @default(uuid())
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityToProduce Float
+  status            String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  createdById       String
+  createdBy         User      @relation(fields: [createdById], references: [id])
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+}
+
+model Sale {
+  id           String     @id @default(uuid())
+  totalAmount  Float      @default(0)
+  status       String     @default("COMPLETED") // COMPLETED, CANCELLED
+  sellerId     String
+  seller       User       @relation(fields: [sellerId], references: [id])
+  customerName String?
+  createdAt    DateTime   @default(now())
+  items        SaleItem[]
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Float
+  unitPrice Float
+  subtotal  Float
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userName  String?
+  userRole  String?
+  action    String   // ex: CREATE, UPDATE, DELETE, LOGIN, PRODUCTION, SALE
+  entity    String   // ex: Product, Supply, User, Sale, ProductionOrder
+  entityId  String?
+  details   String?  // JSON stringificado com dados adicionais
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
